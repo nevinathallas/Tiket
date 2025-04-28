@@ -1,4 +1,16 @@
 <?php
+require 'vendor/autoload.php';
+
+use GuzzleHttp\Client;
+
+$client = new Client();
+$response = $client->request('GET', 'http://localhost:8000/api/transports', [
+    // 'headers' => [
+    //     'Authorization' => 'Bearer TOKEN_ANDA'
+    // ]
+]);
+
+$data = json_decode($response->getBody(), true);
 
 class TranportIndex
 {
@@ -49,6 +61,7 @@ class TranportIndex
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,30 +80,35 @@ class TranportIndex
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Name</th>
-                    <th>Type</th>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Seat</th>
+                    <th>Transport Type</th>
                 </tr>
             </thead>
             <tbody>
-            <?php
-                try {
-                    $apiBaseUrl = 'http://127.0.0.1:8000/admin/api-docs'; // Update sesuai konfigurasi Anda
-                    $transportService = new TranportIndex($apiBaseUrl);
+                <?php
+                // Step 1: Fetch data from the API
+                $apiUrl = 'http://localhost:8000/api/transports'; // Change this to your actual API URL
+                $response = file_get_contents($apiUrl);
 
-                    $transports = $transportService->getTransports();
-                    if (is_array($transports)) {
-                        foreach ($transports as $transport) {
-                            echo "<tr>
-                                    <td>{$transport['id']}</td>
-                                    <td>{$transport['name']}</td>
-                                    <td>{$transport['type']}</td>
-                                </tr>";
-                        }
-                    } else {
-                        echo "<tr><td colspan='3'>No data available</td></tr>";
+                // Step 2: Decode the JSON response
+                $data = json_decode($response, true);
+
+                // Step 3: Check for success and display the data
+                if ($data && $data['success']) {
+                    foreach ($data['data'] as $transport) {
+                        echo "<tr>";
+                        echo "<td>{$transport['id']}</td>";
+                        echo "<td>{$transport['code']}</td>";
+                        echo "<td>{$transport['description']}</td>";
+                        echo "<td>{$transport['seat']}</td>";
+                        echo "<td>{$transport['transport_type']['description']}</td>";
+                        echo "</tr>";
                     }
-                } catch (Exception $e) {
-                    echo "<tr><td colspan='3'>Error: {$e->getMessage()}</td></tr>";
+                    echo "</table>";
+                } else {
+                    echo "Gagal mengambil data transportasi.";
                 }
                 ?>
             </tbody>
@@ -101,25 +119,36 @@ class TranportIndex
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Origin</th>
-                    <th>Destination</th>
+                    <th>Route</th>
+                    <th>Depart Time</th>
+                    <th>Price</th>
+                    <th>Transport Code</th>
+                    <th>Transport Name</th>
                 </tr>
             </thead>
             <tbody>
-                <?php
-                try {
-                    $routes = $transportService->getRoutes();
-                    foreach ($routes as $route) {
-                        echo "<tr>
-                                <td>{$route['id']}</td>
-                                <td>{$route['origin']}</td>
-                                <td>{$route['destination']}</td>
-                              </tr>";
-                    }
-                } catch (Exception $e) {
-                    echo "<tr><td colspan='3'>Error: {$e->getMessage()}</td></tr>";
+            <?php
+            $apiUrl = 'http://localhost:8000/api/routes';
+            $response = file_get_contents($apiUrl);
+            $data = json_decode($response, true);
+
+            if ($data && $data['success']) {
+                foreach ($data['data'] as $route) {
+                    echo "<tr>";
+                    echo "<td>{$route['id']}</td>";
+                    echo "<td>{$route['route_from']} - {$route['route_to']}</td>";
+                    $departTime = isset($route['depart']) ? date('d-m-Y H:i', strtotime($route['depart'])) : '-';
+                    echo "<td>{$departTime}</td>";
+                    $price = isset($route['price']) ? 'Rp ' . number_format($route['price'], 0, ',', '.') : '-';
+                    echo "<td>{$price}</td>";
+                    echo "<td>{$route['transport']['code']}</td>";
+                    echo "<td>{$route['transport']['description']}</td>";
+                    echo "</tr>";
                 }
-                ?>
+            } else {
+                echo "<tr><td colspan='6'>No data available</td></tr>";
+            }
+            ?>
             </tbody>
         </table>
 
@@ -129,24 +158,38 @@ class TranportIndex
                 <tr>
                     <th>ID</th>
                     <th>Route</th>
-                    <th>Time</th>
+                    <th>Depart Time</th>
+                    <th>Available Seats</th>
+                    <th>Price</th>
+                    <th>Transport Code</th>
+                    <th>Transport Name</th>
                 </tr>
             </thead>
             <tbody>
-                <?php
-                try {
-                    $schedules = $transportService->getSchedules();
-                    foreach ($schedules as $schedule) {
-                        echo "<tr>
-                                <td>{$schedule['id']}</td>
-                                <td>{$schedule['route']}</td>
-                                <td>{$schedule['time']}</td>
-                              </tr>";
+            <?php
+                $apiUrl = 'http://localhost:8000/api/schedules';
+                $response = file_get_contents($apiUrl);
+                $data = json_decode($response, true);
+
+                if ($data && $data['success']) {
+                    foreach ($data['data'] as $schedule) {
+                        echo "<tr>";
+                        echo "<td>{$schedule['id']}</td>";
+                        echo "<td>{$schedule['route_from']} - {$schedule['route_to']}</td>";
+                        // Format waktu agar mudah dibaca
+                        $departTime = date('d-m-Y H:i', strtotime($schedule['depart']));
+                        echo "<td>{$departTime}</td>";
+                        echo "<td>{$schedule['transport']['seat']}</td>";
+                        $price = "Rp " . number_format($schedule['price'], 0, ',', '.');
+                        echo "<td>{$price}</td>";
+                        echo "<td>{$schedule['transport']['code']}</td>";
+                        echo "<td>{$schedule['transport']['description']}</td>";
+                        echo "</tr>";
                     }
-                } catch (Exception $e) {
-                    echo "<tr><td colspan='3'>Error: {$e->getMessage()}</td></tr>";
+                } else {
+                    echo "<tr><td colspan='9'>No data available</td></tr>";
                 }
-                ?>
+            ?>
             </tbody>
         </table>
     </div>
